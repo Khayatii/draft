@@ -1,0 +1,93 @@
+cc service
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.CreditCard;
+import java.util.List;
+
+public interface CreditCardService {
+
+    // US6: Accept Offer
+    CreditCard acceptOffer(Long applicationId, Double creditLimit);
+
+    // CRUD operations
+    CreditCard saveCreditCard(CreditCard card);
+    List<CreditCard> getAllCreditCards();
+    CreditCard getCreditCardById(Long id);
+    CreditCard updateCreditCard(Long id, CreditCard cardDetails);
+    void deleteCreditCard(Long id);
+}
+
+
+cc service impl
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.dao.CreditCardRepository;
+import com.ngos.creditcard.model.CreditCard;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class CreditCardServiceImpl implements CreditCardService {
+
+    private final CreditCardRepository creditCardRepository;
+
+    public CreditCardServiceImpl(CreditCardRepository creditCardRepository) {
+        this.creditCardRepository = creditCardRepository;
+    }
+
+    // ---------------------------
+    // US6: Accept Offer
+    // ---------------------------
+    @Override
+    public CreditCard acceptOffer(Long applicationId, Double creditLimit) {
+        // Create a new credit card linked to this application
+        CreditCard card = new CreditCard();
+        card.setApplicationId(applicationId);
+        card.setCreditLimit(creditLimit);
+        card.setStatus("APPROVED");
+
+        return creditCardRepository.save(card);
+    }
+
+    // ---------------------------
+    // CRUD Implementation
+    // ---------------------------
+    @Override
+    public CreditCard saveCreditCard(CreditCard card) {
+        return creditCardRepository.save(card);
+    }
+
+    @Override
+    public List<CreditCard> getAllCreditCards() {
+        return creditCardRepository.findAll();
+    }
+
+    @Override
+    public CreditCard getCreditCardById(Long id) {
+        return creditCardRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Credit Card not found with id " + id));
+    }
+
+    @Override
+    public CreditCard updateCreditCard(Long id, CreditCard cardDetails) {
+        CreditCard existingCard = creditCardRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Credit Card not found with id " + id));
+
+        existingCard.setCardNumber(cardDetails.getCardNumber());
+        existingCard.setCreditLimit(cardDetails.getCreditLimit());
+        existingCard.setStatus(cardDetails.getStatus());
+        existingCard.setApplicationId(cardDetails.getApplicationId());
+
+        return creditCardRepository.save(existingCard);
+    }
+
+    @Override
+    public void deleteCreditCard(Long id) {
+        CreditCard existingCard = creditCardRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Credit Card not found with id " + id));
+        creditCardRepository.delete(existingCard);
+    }
+}
