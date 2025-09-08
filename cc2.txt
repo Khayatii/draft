@@ -1,0 +1,48 @@
+@RestController
+@RequestMapping("/api/creditcards")
+public class CreditCardController {
+
+    private final CreditCardService creditCardService;
+
+    public CreditCardController(CreditCardService creditCardService) {
+        this.creditCardService = creditCardService;
+    }
+
+    // Accept Offer (your story 6)
+    @PostMapping("/accept-offer/{applicationId}")
+    public CreditCard acceptOffer(@PathVariable Long applicationId,
+                                  @RequestParam Double creditLimit) {
+        return creditCardService.acceptOffer(applicationId, creditLimit);
+    }
+
+    // Create a credit card manually (CRUD demo)
+    @PostMapping
+    public CreditCard createCreditCard(@RequestBody CreditCard card) {
+        return creditCardService.saveCreditCard(card);
+    }
+
+    // Read all
+    @GetMapping
+    public List<CreditCard> getAllCreditCards() {
+        return creditCardService.getAllCreditCards();
+    }
+
+    // Read one
+    @GetMapping("/{id}")
+    public CreditCard getCreditCardById(@PathVariable Long id) {
+        return creditCardService.getCreditCardById(id);
+    }
+
+    // Update
+    @PutMapping("/{id}")
+    public CreditCard updateCreditCard(@PathVariable Long id,
+                                       @RequestBody CreditCard cardDetails) {
+        return creditCardService.updateCreditCard(id, cardDetails);
+    }
+
+    // Delete
+    @DeleteMapping("/{id}")
+    public void deleteCreditCard(@PathVariable Long id) {
+        creditCardService.deleteCreditCard(id);
+    }
+}
