@@ -1,0 +1,304 @@
+ddl script
+
+CREATE TABLE applicant (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    email VARCHAR(150) UNIQUE,
+    credit_score INT
+);
+
+CREATE TABLE application (
+    id SERIAL PRIMARY KEY,
+    applicant_id INT REFERENCES applicant(id),
+    status VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE credit_card (
+    id SERIAL PRIMARY KEY,
+    application_id INT REFERENCES application(id),
+    card_number VARCHAR(16) UNIQUE,
+    status VARCHAR(50),
+    expiry_date DATE
+);
+
+
+Application.java
+
+@Entity
+public class Application {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long applicationId;
+
+    private Long applicantId;
+    private Integer creditScore;
+    private String status; // PENDING, APPROVED, REJECTED
+    private Double assignedCreditLimit;
+
+    // getters & setters
+}
+
+
+CreditCard.java
+
+@Entity
+public class CreditCard {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long cardId;
+
+    private Long applicationId;
+    private String cardNumber;
+    private LocalDate expiryDate;
+    private String status; // ACTIVE, BLOCKED
+
+    // getters & setters
+}
+
+
+applicationservice
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.Application;
+
+public interface ApplicationService {
+    Application acceptOffer(Long applicationId);
+}
+
+
+applicationserviceimpl
+
+package com.ngos.creditcard.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.ngos.creditcard.dao.ApplicationRepository;
+import com.ngos.creditcard.exception.ResourceNotFoundException;
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.model.CreditCard;
+
+@Service
+public class ApplicationServiceImpl implements ApplicationService {
+
+    @Autowired
+    private ApplicationRepository applicationRepository;
+
+    @Autowired
+    private CreditCardService creditCardService;
+
+    @Autowired
+    private NotificationService notificationService;
+
+    @Override
+    public Application acceptOffer(Long applicationId) {
+        Application app = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+
+        app.setStatus("APPROVED");
+        applicationRepository.save(app);
+
+        // Issue card
+        CreditCard card = creditCardService.issueCard(app);
+
+        // Notify external systems
+        notificationService.notifyAllSystems(card);
+
+        return app;
+    }
+}
+
+
+creditcardservice
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.CreditCard;
+import java.util.List;
+
+public interface CreditCardService {
+    CreditCard issueCard(com.ngos.creditcard.model.Application application);
+
+    // CRUD methods
+    CreditCard create(CreditCard card);
+    CreditCard getById(Long id);
+    List<CreditCard> getAll();
+    CreditCard update(Long id, CreditCard updatedCard);
+    void delete(Long id);
+}
+
+
+creditcardserviceimpl
+
+package com.ngos.creditcard.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import com.ngos.creditcard.dao.CreditCardRepository;
+import com.ngos.creditcard.exception.ResourceNotFoundException;
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.model.CreditCard;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class CreditCardServiceImpl implements CreditCardService {
+
+    @Autowired
+    private CreditCardRepository creditCardRepository;
+
+    @Override
+    public CreditCard issueCard(Application application) {
+        CreditCard card = new CreditCard();
+        card.setApplication(application);
+        card.setCardNumber(UUID.randomUUID().toString().substring(0,16));
+        card.setStatus("ACTIVE");
+        card.setExpiryDate(LocalDate.now().plusYears(5));
+
+        return creditCardRepository.save(card);
+    }
+
+    // --- CRUD methods ---
+    @Override
+    public CreditCard create(CreditCard card) {
+        return creditCardRepository.save(card);
+    }
+
+    @Override
+    public CreditCard getById(Long id) {
+        return creditCardRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Credit Card not found with id " + id));
+    }
+
+    @Override
+    public List<CreditCard> getAll() {
+        return creditCardRepository.findAll();
+    }
+
+    @Override
+    public CreditCard update(Long id, CreditCard updatedCard) {
+        CreditCard card = getById(id);
+        card.setStatus(updatedCard.getStatus());
+        card.setExpiryDate(updatedCard.getExpiryDate());
+        return creditCardRepository.save(card);
+    }
+
+    @Override
+    public void delete(Long id) {
+        CreditCard card = getById(id);
+        creditCardRepository.delete(card);
+    }
+}
+
+notificationservice
+
+
+package com.ngos.creditcard.service;
+
+import org.springframework.stereotype.Service;
+import com.ngos.creditcard.model.CreditCard;
+
+@Service
+public class NotificationService {
+
+    public void notifyAllSystems(CreditCard card) {
+        notifyTPS(card);
+        notifyMailManager(card);
+        notifyPrintShop(card);
+    }
+
+    private void notifyTPS(CreditCard card) {
+        // simulate API call
+        System.out.println("✅ Notifying TPS for card: " + card.getCardNumber());
+    }
+
+    private void notifyMailManager(CreditCard card) {
+        // simulate email
+        System.out.println("📧 Email sent to applicant for card: " + card.getCardNumber());
+    }
+
+    private void notifyPrintShop(CreditCard card) {
+        // simulate print request
+        System.out.println("🖨️ PrintShop request for card: " + card.getCardNumber());
+    }
+}
+
+creditcardcontroller
+
+package com.ngos.creditcard.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import com.ngos.creditcard.model.CreditCard;
+import com.ngos.creditcard.service.CreditCardService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/credit-cards")
+public class CreditCardController {
+
+    @Autowired
+    private CreditCardService creditCardService;
+
+    // Create
+    @PostMapping
+    public CreditCard create(@RequestBody CreditCard card) {
+        return creditCardService.create(card);
+    }
+
+    // Read One
+    @GetMapping("/{id}")
+    public CreditCard getById(@PathVariable Long id) {
+        return creditCardService.getById(id);
+    }
+
+    // Read All
+    @GetMapping
+    public List<CreditCard> getAll() {
+        return creditCardService.getAll();
+    }
+
+    // Update
+    @PutMapping("/{id}")
+    public CreditCard update(@PathVariable Long id, @RequestBody CreditCard card) {
+        return creditCardService.update(id, card);
+    }
+
+    // Delete
+    @DeleteMapping("/{id}")
+    public String delete(@PathVariable Long id) {
+        creditCardService.delete(id);
+        return "Credit Card with id " + id + " deleted successfully.";
+    }
+}
+
+
+application controller
+
+package com.ngos.creditcard.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.service.ApplicationService;
+
+@RestController
+@RequestMapping("/applications")
+public class ApplicationController {
+
+    @Autowired
+    private ApplicationService applicationService;
+
+    @PutMapping("/{id}/accept-offer")
+    public Application acceptOffer(@PathVariable Long id) {
+        return applicationService.acceptOffer(id);
+    }
+}
+
