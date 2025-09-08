@@ -1,0 +1,30 @@
+@RestController
+@RequestMapping("/api/creditcards")
+public class CreditCardController {
+
+    private final CreditCardService creditCardService;
+
+    public CreditCardController(CreditCardService creditCardService) {
+        this.creditCardService = creditCardService;
+    }
+
+    @PostMapping
+    public CreditCard createCreditCard(@RequestBody CreditCard creditCard) {
+        return creditCardService.saveCreditCard(creditCard);
+    }
+
+    @GetMapping
+    public List<CreditCard> getAllCreditCards() {
+        return creditCardService.getAllCreditCards();
+    }
+
+    @GetMapping("/{id}")
+    public CreditCard getCreditCardById(@PathVariable Long id) {
+        return creditCardService.getCreditCardById(id);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteCreditCard(@PathVariable Long id) {
+        creditCardService.deleteCreditCard(id);
+    }
+}
