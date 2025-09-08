@@ -1,0 +1,344 @@
+Application.java (Entity)
+package com.ngos.creditcard.model;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name = "applications")
+public class Application {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "applicant_name", nullable = false)
+    private String applicantName;
+
+    @Column(name = "email", nullable = false, unique = true)
+    private String email;
+
+    @Column(name = "credit_score", nullable = false)
+    private int creditScore;
+
+    @Column(name = "status", nullable = false)
+    private String status; // e.g., PENDING, OFFER_ACCEPTED
+
+    // Constructors
+    public Application() {}
+
+    public Application(String applicantName, String email, int creditScore, String status) {
+        this.applicantName = applicantName;
+        this.email = email;
+        this.creditScore = creditScore;
+        this.status = status;
+    }
+
+    // Getters & Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getApplicantName() { return applicantName; }
+    public void setApplicantName(String applicantName) { this.applicantName = applicantName; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public int getCreditScore() { return creditScore; }
+    public void setCreditScore(int creditScore) { this.creditScore = creditScore; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+}
+
+2. CreditCard.java (Entity)
+package com.ngos.creditcard.model;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name = "credit_cards")
+public class CreditCard {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "card_number", nullable = false, unique = true)
+    private String cardNumber;
+
+    @Column(name = "credit_limit", nullable = false)
+    private Double creditLimit;
+
+    @Column(name = "status", nullable = false)
+    private String status; // e.g., ACTIVE, FAILED
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "application_id", nullable = false)
+    private Application application;
+
+    // Constructors
+    public CreditCard() {}
+
+    public CreditCard(String cardNumber, Double creditLimit, String status, Application application) {
+        this.cardNumber = cardNumber;
+        this.creditLimit = creditLimit;
+        this.status = status;
+        this.application = application;
+    }
+
+    // Getters & Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getCardNumber() { return cardNumber; }
+    public void setCardNumber(String cardNumber) { this.cardNumber = cardNumber; }
+
+    public Double getCreditLimit() { return creditLimit; }
+    public void setCreditLimit(Double creditLimit) { this.creditLimit = creditLimit; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public Application getApplication() { return application; }
+    public void setApplication(Application application) { this.application = application; }
+}
+3. ApplicationService.java (Interface)
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.Application;
+import java.util.List;
+
+public interface ApplicationService {
+    Application createApplication(Application application);
+    List<Application> getAllApplications();
+    Application getApplicationById(Long id);
+    void deleteApplication(Long id);
+}
+
+4. ApplicationServiceImpl.java
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.dao.ApplicationRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class ApplicationServiceImpl implements ApplicationService {
+
+    private final ApplicationRepository applicationRepository;
+
+    public ApplicationServiceImpl(ApplicationRepository applicationRepository) {
+        this.applicationRepository = applicationRepository;
+    }
+
+    @Override
+    public Application createApplication(Application application) {
+        application.setStatus("PENDING");
+        return applicationRepository.save(application);
+    }
+
+    @Override
+    public List<Application> getAllApplications() {
+        return applicationRepository.findAll();
+    }
+
+    @Override
+    public Application getApplicationById(Long id) {
+        return applicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Application not found with ID: " + id));
+    }
+
+    @Override
+    public void deleteApplication(Long id) {
+        applicationRepository.deleteById(id);
+    }
+}
+
+5. CreditCardService.java (Interface)
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.CreditCard;
+
+public interface CreditCardService {
+    CreditCard acceptOffer(Long applicationId, Double creditLimit);
+}
+
+6. CreditCardServiceImpl.java
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.dao.ApplicationRepository;
+import com.ngos.creditcard.dao.CreditCardRepository;
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.model.CreditCard;
+import org.springframework.stereotype.Service;
+
+import java.util.UUID;
+
+@Service
+public class CreditCardServiceImpl implements CreditCardService {
+
+    private final ApplicationRepository applicationRepository;
+    private final CreditCardRepository creditCardRepository;
+    private final NotificationService notificationService;
+
+    public CreditCardServiceImpl(ApplicationRepository applicationRepository,
+                                 CreditCardRepository creditCardRepository,
+                                 NotificationService notificationService) {
+        this.applicationRepository = applicationRepository;
+        this.creditCardRepository = creditCardRepository;
+        this.notificationService = notificationService;
+    }
+
+    @Override
+    public CreditCard acceptOffer(Long applicationId, Double creditLimit) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        application.setStatus("OFFER_ACCEPTED");
+        applicationRepository.save(application);
+
+        String generatedCardNumber = "CC-" + UUID.randomUUID().toString().substring(0, 8);
+
+        CreditCard card = new CreditCard(generatedCardNumber, creditLimit, "ACTIVE", application);
+        creditCardRepository.save(card);
+
+        notificationService.notifyAllSystems(card);
+
+        return card;
+    }
+}
+
+7. NotificationService.java
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.CreditCard;
+import org.springframework.stereotype.Service;
+
+@Service
+public class NotificationService {
+
+    public void notifyAllSystems(CreditCard card) {
+        notifyTPS(card);
+        notifyMailManager(card);
+        notifyPrintShop(card);
+    }
+
+    private void notifyTPS(CreditCard card) {
+        System.out.println("✅ TPS notified for card: " + card.getCardNumber());
+    }
+
+    private void notifyMailManager(CreditCard card) {
+        System.out.println("📧 Email sent to applicant: " + card.getApplication().getEmail());
+    }
+
+    private void notifyPrintShop(CreditCard card) {
+        System.out.println("🖨 PrintShop request generated for card: " + card.getCardNumber());
+    }
+}
+
+8. ApplicationController.java
+package com.ngos.creditcard.controller;
+
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.service.ApplicationService;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/applications")
+public class ApplicationController {
+
+    private final ApplicationService applicationService;
+
+    public ApplicationController(ApplicationService applicationService) {
+        this.applicationService = applicationService;
+    }
+
+    @PostMapping
+    public Application createApplication(@RequestBody Application application) {
+        return applicationService.createApplication(application);
+    }
+
+    @GetMapping
+    public List<Application> getAllApplications() {
+        return applicationService.getAllApplications();
+    }
+
+    @GetMapping("/{id}")
+    public Application getApplicationById(@PathVariable Long id) {
+        return applicationService.getApplicationById(id);
+    }
+
+    @DeleteMapping("/{id}")
+    public String deleteApplication(@PathVariable Long id) {
+        applicationService.deleteApplication(id);
+        return "Application deleted successfully!";
+    }
+}
+
+9. CreditCardController.java
+package com.ngos.creditcard.controller;
+
+import com.ngos.creditcard.model.CreditCard;
+import com.ngos.creditcard.service.CreditCardService;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/creditcards")
+public class CreditCardController {
+
+    private final CreditCardService creditCardService;
+
+    public CreditCardController(CreditCardService creditCardService) {
+        this.creditCardService = creditCardService;
+    }
+
+    @PostMapping("/accept-offer/{applicationId}")
+    public CreditCard acceptOffer(@PathVariable Long applicationId,
+                                  @RequestParam Double creditLimit) {
+        return creditCardService.acceptOffer(applicationId, creditLimit);
+    }
+}
+
+schema.sql
+-- Drop old tables if they exist
+DROP TABLE IF EXISTS credit_cards CASCADE;
+DROP TABLE IF EXISTS applications CASCADE;
+
+-- Applications Table
+CREATE TABLE applications (
+    id BIGSERIAL PRIMARY KEY,
+    applicant_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    credit_score INT NOT NULL,
+    status VARCHAR(50) NOT NULL
+);
+
+-- Credit Cards Table
+CREATE TABLE credit_cards (
+    id BIGSERIAL PRIMARY KEY,
+    card_number VARCHAR(50) NOT NULL UNIQUE,
+    credit_limit NUMERIC(15,2) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    application_id BIGINT NOT NULL,
+    CONSTRAINT fk_application
+        FOREIGN KEY (application_id)
+        REFERENCES applications(id)
+        ON DELETE CASCADE
+);
+
+-- Insert sample applicants (applications table)
+INSERT INTO applications (applicant_name, email, credit_score, status)
+VALUES 
+('Alice Johnson', 'alice@example.com', 780, 'PENDING'),
+('Bob Smith', 'bob@example.com', 720, 'REJECTED'),
+('Charlie Davis', 'charlie@example.com', 800, 'OFFER_GENERATED');
+
+-- Insert sample credit cards (credit_cards table)
+-- Only linked to applications that have offers
+INSERT INTO credit_cards (card_number, credit_limit, status, application_id)
+VALUES
+('4111111111111111', 50000.00, 'PENDING_ACCEPTANCE', 3);
