@@ -1,0 +1,113 @@
+controller
+
+package com.ngos.creditcard.controller;
+
+import com.ngos.creditcard.model.CreditCard;
+import com.ngos.creditcard.service.CreditCardService;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/creditcards")
+public class CreditCardController {
+
+    private final CreditCardService creditCardService;
+
+    public CreditCardController(CreditCardService creditCardService) {
+        this.creditCardService = creditCardService;
+    }
+
+    // Accept Offer = Create Credit Card if conditions are met
+    @PostMapping("/accept-offer/{applicationId}")
+    public CreditCard acceptOffer(@PathVariable Long applicationId,
+                                  @RequestParam Double creditLimit) {
+        return creditCardService.acceptOffer(applicationId, creditLimit);
+    }
+
+    // Optional: read-only endpoints for demo (list, get by id)
+    @GetMapping
+    public java.util.List<CreditCard> getAllCards() {
+        return creditCardService.getAllCreditCards();
+    }
+
+    @GetMapping("/{id}")
+    public CreditCard getCardById(@PathVariable Long id) {
+        return creditCardService.getCreditCardById(id);
+    }
+}
+
+
+service
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.CreditCard;
+import java.util.List;
+
+public interface CreditCardService {
+    CreditCard acceptOffer(Long applicationId, Double creditLimit);
+    List<CreditCard> getAllCreditCards();
+    CreditCard getCreditCardById(Long id);
+}
+
+serviceimpl
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.dao.ApplicationRepository;
+import com.ngos.creditcard.dao.CreditCardRepository;
+import com.ngos.creditcard.model.Application;
+import com.ngos.creditcard.model.CreditCard;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class CreditCardServiceImpl implements CreditCardService {
+
+    private final CreditCardRepository creditCardRepository;
+    private final ApplicationRepository applicationRepository;
+
+    public CreditCardServiceImpl(CreditCardRepository creditCardRepository,
+                                 ApplicationRepository applicationRepository) {
+        this.creditCardRepository = creditCardRepository;
+        this.applicationRepository = applicationRepository;
+    }
+
+    @Override
+    public CreditCard acceptOffer(Long applicationId, Double creditLimit) {
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found with id " + applicationId));
+
+        if (app.getCreditScore() <= 750) {
+            throw new RuntimeException("Offer cannot be accepted. Credit score too low.");
+        }
+
+        CreditCard card = new CreditCard();
+        card.setApplicationId(applicationId);
+        card.setCreditLimit(creditLimit);
+        card.setStatus("APPROVED");
+
+        return creditCardRepository.save(card);
+    }
+
+    @Override
+    public List<CreditCard> getAllCreditCards() {
+        return creditCardRepository.findAll();
+    }
+
+    @Override
+    public CreditCard getCreditCardById(Long id) {
+        return creditCardRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Credit Card not found with id " + id));
+    }
+}
+
+repo
+
+package com.ngos.creditcard.dao;
+
+import com.ngos.creditcard.model.CreditCard;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CreditCardRepository extends JpaRepository<CreditCard, Long> {
+}
