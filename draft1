@@ -1,97 +1,3 @@
-cc.java
-
-package com.ngos.creditcard.model;
-
-import javax.persistence.*;
-
-@Entity
-@Table(name = "credit_cards")
-public class CreditCard {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "card_number", unique = true)
-    private String cardNumber;
-
-    @Column(name = "credit_limit")
-    private Double creditLimit;
-
-    @Column(name = "status")
-    private String status;
-
-    // relation with Application
-    @ManyToOne
-    @JoinColumn(name = "application_id", nullable = false)
-    private Application application;
-
-    // ---------- getters & setters ----------
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getCardNumber() {
-        return cardNumber;
-    }
-
-    public void setCardNumber(String cardNumber) {
-        this.cardNumber = cardNumber;
-    }
-
-    public Double getCreditLimit() {
-        return creditLimit;
-    }
-
-    public void setCreditLimit(Double creditLimit) {
-        this.creditLimit = creditLimit;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public Application getApplication() {
-        return application;
-    }
-
-    public void setApplication(Application application) {
-        this.application = application;
-    }
-}
-
-
-ccserviceimpl.java
-
-@Override
-public CreditCard acceptOffer(Long applicationId, Double creditLimit) {
-    Application app = applicationRepository.findById(applicationId)
-            .orElseThrow(() -> new RuntimeException("Application not found with id " + applicationId));
-
-    if (app.getCreditScore() <= 750) {
-        throw new RuntimeException("Offer cannot be accepted. Credit score too low.");
-    }
-
-    CreditCard card = new CreditCard();
-    card.setApplication(app);   // ✅ set Application object instead of just id
-    card.setCreditLimit(creditLimit);
-    card.setStatus("APPROVED");
-
-    // you can generate a dummy card number for demo
-    card.setCardNumber("CC-" + System.currentTimeMillis());
-
-    return creditCardRepository.save(card);
-}
-
 application.java
 
 package com.ngos.creditcard.model;
@@ -110,13 +16,16 @@ public class Application {
     @Column(name = "applicant_name")
     private String applicantName;
 
+    @Column(name = "email")
+    private String email;   // ✅ Needed for NotificationService
+
     @Column(name = "credit_score")
     private Integer creditScore;
 
     @Column(name = "status")
     private String status;
 
-    // ✅ Reverse mapping: One Application can have many CreditCards
+    // ✅ One Application can have many CreditCards
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CreditCard> creditCards;
 
@@ -125,7 +34,6 @@ public class Application {
     public Long getId() {
         return id;
     }
-
     public void setId(Long id) {
         this.id = id;
     }
@@ -133,15 +41,20 @@ public class Application {
     public String getApplicantName() {
         return applicantName;
     }
-
     public void setApplicantName(String applicantName) {
         this.applicantName = applicantName;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public Integer getCreditScore() {
         return creditScore;
     }
-
     public void setCreditScore(Integer creditScore) {
         this.creditScore = creditScore;
     }
@@ -149,7 +62,6 @@ public class Application {
     public String getStatus() {
         return status;
     }
-
     public void setStatus(String status) {
         this.status = status;
     }
@@ -157,9 +69,38 @@ public class Application {
     public List<CreditCard> getCreditCards() {
         return creditCards;
     }
-
     public void setCreditCards(List<CreditCard> creditCards) {
         this.creditCards = creditCards;
     }
 }
 
+
+notificationservice.java
+
+package com.ngos.creditcard.service;
+
+import com.ngos.creditcard.model.CreditCard;
+import org.springframework.stereotype.Service;
+
+@Service
+public class NotificationService {
+
+    public void notifyAllSystems(CreditCard card) {
+        notifyTPS(card);
+        notifyMailManager(card);
+        notifyPrintShop(card);
+    }
+
+    private void notifyTPS(CreditCard card) {
+        System.out.println("✅ Notifying TPS for card: " + card.getCardNumber());
+    }
+
+    private void notifyMailManager(CreditCard card) {
+        String email = card.getApplication().getEmail();
+        System.out.println("📧 Email sent to applicant (" + email + ") for card: " + card.getCardNumber());
+    }
+
+    private void notifyPrintShop(CreditCard card) {
+        System.out.println("🖨️ PrintShop request for card: " + card.getCardNumber());
+    }
+}
