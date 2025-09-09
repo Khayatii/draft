@@ -1,0 +1,165 @@
+cc.java
+
+package com.ngos.creditcard.model;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name = "credit_cards")
+public class CreditCard {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "card_number", unique = true)
+    private String cardNumber;
+
+    @Column(name = "credit_limit")
+    private Double creditLimit;
+
+    @Column(name = "status")
+    private String status;
+
+    // relation with Application
+    @ManyToOne
+    @JoinColumn(name = "application_id", nullable = false)
+    private Application application;
+
+    // ---------- getters & setters ----------
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getCardNumber() {
+        return cardNumber;
+    }
+
+    public void setCardNumber(String cardNumber) {
+        this.cardNumber = cardNumber;
+    }
+
+    public Double getCreditLimit() {
+        return creditLimit;
+    }
+
+    public void setCreditLimit(Double creditLimit) {
+        this.creditLimit = creditLimit;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Application getApplication() {
+        return application;
+    }
+
+    public void setApplication(Application application) {
+        this.application = application;
+    }
+}
+
+
+ccserviceimpl.java
+
+@Override
+public CreditCard acceptOffer(Long applicationId, Double creditLimit) {
+    Application app = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new RuntimeException("Application not found with id " + applicationId));
+
+    if (app.getCreditScore() <= 750) {
+        throw new RuntimeException("Offer cannot be accepted. Credit score too low.");
+    }
+
+    CreditCard card = new CreditCard();
+    card.setApplication(app);   // ✅ set Application object instead of just id
+    card.setCreditLimit(creditLimit);
+    card.setStatus("APPROVED");
+
+    // you can generate a dummy card number for demo
+    card.setCardNumber("CC-" + System.currentTimeMillis());
+
+    return creditCardRepository.save(card);
+}
+
+application.java
+
+package com.ngos.creditcard.model;
+
+import javax.persistence.*;
+import java.util.List;
+
+@Entity
+@Table(name = "applications")
+public class Application {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "applicant_name")
+    private String applicantName;
+
+    @Column(name = "credit_score")
+    private Integer creditScore;
+
+    @Column(name = "status")
+    private String status;
+
+    // ✅ Reverse mapping: One Application can have many CreditCards
+    @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CreditCard> creditCards;
+
+    // ---------- getters & setters ----------
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getApplicantName() {
+        return applicantName;
+    }
+
+    public void setApplicantName(String applicantName) {
+        this.applicantName = applicantName;
+    }
+
+    public Integer getCreditScore() {
+        return creditScore;
+    }
+
+    public void setCreditScore(Integer creditScore) {
+        this.creditScore = creditScore;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public List<CreditCard> getCreditCards() {
+        return creditCards;
+    }
+
+    public void setCreditCards(List<CreditCard> creditCards) {
+        this.creditCards = creditCards;
+    }
+}
+
